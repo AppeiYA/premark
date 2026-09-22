@@ -1,0 +1,9 @@
+.PHONY: build test vet fmt arch-check check run smoke
+build:       ; go build ./...
+test:        ; go test ./...
+vet:         ; go vet ./...
+fmt:         ; test -z "$$(gofmt -l .)" || (gofmt -l . && exit 1)
+arch-check:  ; sh scripts/arch-check.sh
+check: fmt vet build arch-check test
+run:         ; go run ./cmd/premark
+smoke:       ; go run ./cmd/smoke
