@@ -258,7 +258,7 @@ func NewRouter(d Deps) http.Handler {
 		writeJSON(w, http.StatusOK, SignalsResponse{Signals: dtos})
 	})
 
-	mux.HandleFunc("POST /v1/scan", func(w http.ResponseWriter, r *http.Request) {
+	scanHandler := func(w http.ResponseWriter, r *http.Request) {
 		if d.AdminToken != "" {
 			adminToken := strings.TrimSpace(r.Header.Get("X-Admin-Token"))
 			if adminToken != d.AdminToken {
@@ -274,6 +274,16 @@ func NewRouter(d Deps) http.Handler {
 		}
 
 		writeJSON(w, http.StatusOK, toScanDTO(report))
+	}
+
+	mux.HandleFunc("POST /v1/scan", scanHandler)
+
+	mux.HandleFunc("POST /ui/scan", func(w http.ResponseWriter, r *http.Request) {
+		internalReq := r.Clone(r.Context())
+		if d.AdminToken != "" {
+			internalReq.Header.Set("X-Admin-Token", d.AdminToken)
+		}
+		scanHandler(w, internalReq)
 	})
 
 	// Wrap with panic recovery and logging middleware

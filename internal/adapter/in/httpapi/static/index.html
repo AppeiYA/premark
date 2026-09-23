@@ -305,7 +305,7 @@
       fb.style.display = 'block';
       fb.textContent = 'Scanning market and evaluating rules...';
       try {
-        const res = await fetch('/v1/scan', { method: 'POST' });
+        const res = await fetch('/ui/scan', { method: 'POST' });
         const data = await res.json();
         if (res.ok) {
           fb.textContent = `Scan complete: ${data.snapshots} snapshots, ${data.rules_evaluated} rules evaluated, ${data.signals_created} signals created, ${data.skipped} skipped.`;

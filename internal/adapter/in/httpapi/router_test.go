@@ -22,7 +22,7 @@ func TestHTTPAPI_Router(t *testing.T) {
 	app.Source.Snapshots = []domain.MarketSnapshot{snap}
 	_ = app.Snapshots.SaveAll(context.Background(), []domain.MarketSnapshot{snap})
 
-	t.Run("GET / returns static index HTML", func(t *testing.T) {
+	t.Run("GET / returns static index HTML without leaking admin token", func(t *testing.T) {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		rec := httptest.NewRecorder()
 		app.Router.ServeHTTP(rec, req)
@@ -32,6 +32,13 @@ func TestHTTPAPI_Router(t *testing.T) {
 		}
 		if !strings.Contains(rec.Header().Get("Content-Type"), "text/html") {
 			t.Errorf("expected text/html content type, got %s", rec.Header().Get("Content-Type"))
+		}
+
+		adminApp := testsupport.NewAppWithAdminToken(t, "super-secret-token")
+		adminRec := httptest.NewRecorder()
+		adminApp.Router.ServeHTTP(adminRec, req)
+		if strings.Contains(adminRec.Body.String(), "super-secret-token") {
+			t.Errorf("expected admin token to remain server-side only")
 		}
 	})
 
@@ -382,6 +389,26 @@ func TestHTTPAPI_Router(t *testing.T) {
 		adminApp.Router.ServeHTTP(recValidToken, reqValidToken)
 		if recValidToken.Code != http.StatusOK {
 			t.Errorf("expected 200 OK with valid token, got %d", recValidToken.Code)
+		}
+	})
+
+	t.Run("POST /ui/scan triggers scan with server-side admin token internally", func(t *testing.T) {
+		adminApp := testsupport.NewAppWithAdminToken(t, "super-secret-token")
+		adminApp.Source.Snapshots = []domain.MarketSnapshot{snap}
+
+		// Client sends no X-Admin-Token header, but /ui/scan injects it internally on the server
+		req := httptest.NewRequest(http.MethodPost, "/ui/scan", nil)
+		rec := httptest.NewRecorder()
+		adminApp.Router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK for /ui/scan, got %d body: %s", rec.Code, rec.Body.String())
+		}
+
+		var scanDTO httpapi.ScanDTO
+		_ = json.Unmarshal(rec.Body.Bytes(), &scanDTO)
+		if scanDTO.Snapshots != 1 {
+			t.Errorf("expected 1 snapshot scanned, got %d", scanDTO.Snapshots)
 		}
 	})
 
