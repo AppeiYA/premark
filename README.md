@@ -6,7 +6,7 @@ Set a rule like *"tell me when ANTHROPIC trades 2% or more below its mark price,
 
 Built for the Stocklana hackathon — **Best Use of PreStocks** bounty.
 
-**Live demo:** `<your Render URL here>`
+**Live demo:** `https://premark.onrender.com/`
 **Demo video:** `<link here>`
 
 ---
