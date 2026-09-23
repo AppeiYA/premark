@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"premark/internal/domain"
@@ -258,6 +259,9 @@ func NewRouter(d Deps) http.Handler {
 		writeJSON(w, http.StatusOK, SignalsResponse{Signals: dtos})
 	})
 
+	var lastScanMu sync.RWMutex
+	var lastScanDTO *ScanDTO
+
 	scanHandler := func(w http.ResponseWriter, r *http.Request) {
 		if d.AdminToken != "" {
 			adminToken := strings.TrimSpace(r.Header.Get("X-Admin-Token"))
@@ -273,7 +277,12 @@ func NewRouter(d Deps) http.Handler {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, toScanDTO(report))
+		dto := toScanDTO(report)
+		lastScanMu.Lock()
+		lastScanDTO = &dto
+		lastScanMu.Unlock()
+
+		writeJSON(w, http.StatusOK, dto)
 	}
 
 	mux.HandleFunc("POST /v1/scan", scanHandler)
@@ -284,6 +293,16 @@ func NewRouter(d Deps) http.Handler {
 			internalReq.Header.Set("X-Admin-Token", d.AdminToken)
 		}
 		scanHandler(w, internalReq)
+	})
+
+	mux.HandleFunc("GET /ui/scan/latest", func(w http.ResponseWriter, r *http.Request) {
+		lastScanMu.RLock()
+		defer lastScanMu.RUnlock()
+		if lastScanDTO == nil {
+			writeJSON(w, http.StatusOK, map[string]any{"scan": nil})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"scan": lastScanDTO})
 	})
 
 	// Wrap with panic recovery and logging middleware

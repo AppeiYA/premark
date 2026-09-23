@@ -73,8 +73,14 @@ func toSignalDTO(s domain.Signal) SignalDTO {
 
 func toScanDTO(report ports.ScanReport) ScanDTO {
 	skipReasons := make(map[string]int)
+	skips := make([]RuleSkipDTO, 0, len(report.Evaluation.Skips))
 	for _, skip := range report.Evaluation.Skips {
 		skipReasons[string(skip.Reason)]++
+		skips = append(skips, RuleSkipDTO{
+			RuleID: string(skip.RuleID),
+			Symbol: string(skip.Symbol),
+			Reason: string(skip.Reason),
+		})
 	}
 	return ScanDTO{
 		Snapshots:      report.Snapshots,
@@ -83,5 +89,6 @@ func toScanDTO(report ports.ScanReport) ScanDTO {
 		Skipped:        len(report.Evaluation.Skips),
 		Failed:         len(report.Evaluation.Failures),
 		SkipReasons:    skipReasons,
+		Skips:          skips,
 	}
 }

@@ -41,6 +41,7 @@
     label { font-size: 0.8rem; color: var(--muted); }
     a { color: var(--accent); text-decoration: none; }
     a:hover { text-decoration: underline; }
+    code { font-family: SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace; font-size: 0.8rem; background: rgba(255, 255, 255, 0.08); padding: 0.15rem 0.35rem; border-radius: 4px; }
     .scan-status { margin-top: 0.5rem; font-size: 0.85rem; color: var(--muted); }
   </style>
 </head>
@@ -122,11 +123,32 @@
             <th>Cooldown</th>
             <th>Enabled</th>
             <th>Last Triggered</th>
+            <th>Last Evaluation</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <tr><td colspan="8" style="text-align: center; color: var(--muted);">No rules found</td></tr>
+          <tr><td colspan="9" style="text-align: center; color: var(--muted);">No rules found</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="card" id="skipsCard">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2>Evaluation Skips (Latest Scan)</h2>
+        <span id="skipsSummaryBadge" class="badge badge-fair" style="display: none;"></span>
+      </div>
+      <table id="skipsTable">
+        <thead>
+          <tr>
+            <th>Symbol</th>
+            <th>Rule ID</th>
+            <th>Skip Reason</th>
+            <th>Explanation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="4" style="text-align: center; color: var(--muted);">No skips recorded yet. Click "Scan Now" to evaluate rules.</td></tr>
         </tbody>
       </table>
     </section>
@@ -154,6 +176,26 @@
 
   <script>
     const getOwner = () => document.getElementById('ownerInput').value.trim() || 'demo-user';
+
+    const SKIP_EXPLANATIONS = {
+      'disabled': 'Rule is disabled and was not evaluated',
+      'cooldown_active': 'Cooldown period has not elapsed since the last triggered signal',
+      'no_market_data': 'No live market snapshot available for this symbol',
+      'snapshot_stale': 'Market snapshot is older than 10 minutes',
+      'invalid_price': 'Token price or mark price is zero or negative',
+      'premium_above_threshold': 'Current market premium is higher than rule max premium threshold',
+      'invalid_quote': 'Could not obtain a valid swap quote from Jupiter DEX',
+      'price_divergence': 'Execution price diverges >10% from PreStocks API price',
+      'price_impact_too_high': 'Price impact of the trade exceeds the rule max impact limit',
+      'exec_premium_above_threshold': 'Effective premium after DEX slippage exceeds max premium'
+    };
+
+    function formatReason(reason) {
+      if (!reason) return 'Unknown';
+      return reason.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    }
+
+    let lastRuleSkips = {};
 
     async function loadTokens() {
       try {
@@ -189,7 +231,7 @@
         const data = await res.json();
         const tbody = document.querySelector('#rulesTable tbody');
         if (!data.rules || data.rules.length === 0) {
-          tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color: var(--muted);">No rules found</td></tr>';
+          tbody.innerHTML = '<tr><td colspan="9" style="text-align:center; color: var(--muted);">No rules found</td></tr>';
           return;
         }
         tbody.innerHTML = data.rules.map(r => `
@@ -203,6 +245,13 @@
               <input type="checkbox" ${r.enabled ? 'checked' : ''} onchange="toggleRule('${r.id}', this.checked)">
             </td>
             <td>${r.last_triggered_at ? new Date(r.last_triggered_at).toLocaleTimeString() : 'Never'}</td>
+            <td>
+              ${!r.enabled
+                ? '<span class="badge" style="background: rgba(148, 163, 184, 0.2); color: var(--muted); border: 1px solid var(--border);">Disabled</span>'
+                : lastRuleSkips[r.id]
+                  ? `<span class="badge badge-fair" title="${SKIP_EXPLANATIONS[lastRuleSkips[r.id]] || lastRuleSkips[r.id]}">${formatReason(lastRuleSkips[r.id])}</span>`
+                  : '<span style="color: var(--muted); font-size: 0.8rem;">—</span>'}
+            </td>
             <td>
               <button class="btn-danger" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="deleteRule('${r.id}')">Delete</button>
             </td>
@@ -300,6 +349,60 @@
       }
     }
 
+    function renderScanData(data) {
+      if (!data) return;
+      lastRuleSkips = {};
+      if (data.skips && data.skips.length > 0) {
+        data.skips.forEach(s => {
+          lastRuleSkips[s.rule_id] = s.reason;
+        });
+      }
+
+      const fb = document.getElementById('scanFeedback');
+      fb.style.display = 'block';
+      let html = `<div>⚡ <strong>Scan complete:</strong> ${data.snapshots} snapshots, ${data.rules_evaluated} rules evaluated, ${data.signals_created} signals created, ${data.skipped} skipped.</div>`;
+      if (data.skipped > 0 && data.skip_reasons) {
+        const breakdown = Object.entries(data.skip_reasons)
+          .map(([reason, count]) => `<span class="badge badge-fair" style="margin-left: 0.25rem;" title="${SKIP_EXPLANATIONS[reason] || ''}">${formatReason(reason)} (${count})</span>`)
+          .join(' ');
+        html += `<div style="margin-top: 0.35rem; display: flex; align-items: center; flex-wrap: wrap; gap: 0.25rem;">
+          <span style="font-size: 0.8rem; color: var(--muted);">Skip breakdown:</span> ${breakdown}
+        </div>`;
+      }
+      fb.innerHTML = html;
+
+      // Update Skips Table
+      const skipsTbody = document.querySelector('#skipsTable tbody');
+      const badge = document.getElementById('skipsSummaryBadge');
+      if (data.skips && data.skips.length > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = `${data.skipped} skipped`;
+        skipsTbody.innerHTML = data.skips.map(s => `
+          <tr>
+            <td><strong>${s.symbol}</strong></td>
+            <td><code>${s.rule_id}</code></td>
+            <td><span class="badge badge-fair">${formatReason(s.reason)}</span></td>
+            <td style="color: var(--muted);">${SKIP_EXPLANATIONS[s.reason] || s.reason}</td>
+          </tr>
+        `).join('');
+      } else {
+        badge.style.display = 'none';
+        skipsTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--muted);">No skips in latest scan</td></tr>';
+      }
+    }
+
+    async function loadLatestScan() {
+      try {
+        const res = await fetch('/ui/scan/latest');
+        const data = await res.json();
+        if (data.scan) {
+          renderScanData(data.scan);
+        }
+      } catch (err) {
+        console.error('Failed to load latest scan:', err);
+      }
+    }
+
     async function triggerScan() {
       const fb = document.getElementById('scanFeedback');
       fb.style.display = 'block';
@@ -308,7 +411,7 @@
         const res = await fetch('/ui/scan', { method: 'POST' });
         const data = await res.json();
         if (res.ok) {
-          fb.textContent = `Scan complete: ${data.snapshots} snapshots, ${data.rules_evaluated} rules evaluated, ${data.signals_created} signals created, ${data.skipped} skipped.`;
+          renderScanData(data);
           loadRules();
           loadSignals();
         } else {
@@ -325,7 +428,7 @@
     });
 
     loadTokens();
-    loadRules();
+    loadLatestScan().then(loadRules);
     loadSignals();
     setInterval(loadTokens, 30000);
   </script>

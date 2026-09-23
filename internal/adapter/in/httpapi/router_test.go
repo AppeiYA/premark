@@ -410,6 +410,22 @@ func TestHTTPAPI_Router(t *testing.T) {
 		if scanDTO.Snapshots != 1 {
 			t.Errorf("expected 1 snapshot scanned, got %d", scanDTO.Snapshots)
 		}
+
+		// Verify GET /ui/scan/latest returns the recorded scan
+		reqLatest := httptest.NewRequest(http.MethodGet, "/ui/scan/latest", nil)
+		recLatest := httptest.NewRecorder()
+		adminApp.Router.ServeHTTP(recLatest, reqLatest)
+
+		if recLatest.Code != http.StatusOK {
+			t.Fatalf("expected 200 OK for /ui/scan/latest, got %d", recLatest.Code)
+		}
+		var latestResp struct {
+			Scan *httpapi.ScanDTO `json:"scan"`
+		}
+		_ = json.Unmarshal(recLatest.Body.Bytes(), &latestResp)
+		if latestResp.Scan == nil || latestResp.Scan.Snapshots != 1 {
+			t.Errorf("expected latest scan to be returned with 1 snapshot")
+		}
 	})
 
 	t.Run("unknown route returns 404", func(t *testing.T) {

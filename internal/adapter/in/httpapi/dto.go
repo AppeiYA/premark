@@ -90,6 +90,12 @@ type SignalsResponse struct {
 	Signals []SignalDTO `json:"signals"`
 }
 
+type RuleSkipDTO struct {
+	RuleID string `json:"rule_id"`
+	Symbol string `json:"symbol"`
+	Reason string `json:"reason"`
+}
+
 type ScanDTO struct {
 	Snapshots      int            `json:"snapshots"`
 	RulesEvaluated int            `json:"rules_evaluated"`
@@ -97,4 +103,5 @@ type ScanDTO struct {
 	Skipped        int            `json:"skipped"`
 	Failed         int            `json:"failed"`
 	SkipReasons    map[string]int `json:"skip_reasons"`
+	Skips          []RuleSkipDTO  `json:"skips"`
 }

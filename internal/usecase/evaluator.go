@@ -59,6 +59,7 @@ func (e *Evaluator) EvaluateAll(ctx context.Context, snapshots []domain.MarketSn
 		if !ok {
 			report.Skips = append(report.Skips, ports.RuleSkip{
 				RuleID: rule.ID,
+				Symbol: rule.Symbol,
 				Reason: domain.ReasonNoMarketData,
 			})
 			continue
@@ -68,6 +69,7 @@ func (e *Evaluator) EvaluateAll(ctx context.Context, snapshots []domain.MarketSn
 		if !precheckDecision.Trigger {
 			report.Skips = append(report.Skips, ports.RuleSkip{
 				RuleID: rule.ID,
+				Symbol: rule.Symbol,
 				Reason: precheckDecision.Reason,
 			})
 			continue
@@ -86,6 +88,7 @@ func (e *Evaluator) EvaluateAll(ctx context.Context, snapshots []domain.MarketSn
 		if !decideDecision.Trigger {
 			report.Skips = append(report.Skips, ports.RuleSkip{
 				RuleID: rule.ID,
+				Symbol: rule.Symbol,
 				Reason: decideDecision.Reason,
 			})
 			continue

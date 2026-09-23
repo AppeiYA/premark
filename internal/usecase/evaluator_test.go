@@ -104,6 +104,9 @@ func TestEvaluator_EvaluateAll(t *testing.T) {
 		if report.Skips[0].Reason != domain.ReasonNoMarketData {
 			t.Errorf("expected ReasonNoMarketData, got %s", report.Skips[0].Reason)
 		}
+		if report.Skips[0].Symbol != sym {
+			t.Errorf("expected Symbol=%s, got %s", sym, report.Skips[0].Symbol)
+		}
 	})
 
 	t.Run("precheck fails records skip", func(t *testing.T) {
@@ -132,6 +135,9 @@ func TestEvaluator_EvaluateAll(t *testing.T) {
 		}
 		if report.Skips[0].Reason != domain.ReasonPremiumAboveThreshold {
 			t.Errorf("expected ReasonPremiumAboveThreshold, got %s", report.Skips[0].Reason)
+		}
+		if report.Skips[0].Symbol != sym {
+			t.Errorf("expected Symbol=%s, got %s", sym, report.Skips[0].Symbol)
 		}
 	})
 

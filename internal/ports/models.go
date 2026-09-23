@@ -12,6 +12,7 @@ type MarketView struct {
 
 type RuleSkip struct {
 	RuleID domain.RuleID
+	Symbol domain.Symbol
 	Reason domain.SkipReason
 }
 
